@@ -40,6 +40,7 @@ jobs:
           cd packer-builder-arm
           go mod download
           go build -v .
+          sudo cp packer-builder-arm /usr/local/bin/
           cd ..
 
       - name: Install Packer
@@ -49,7 +50,7 @@ jobs:
 
       - name: Build Image with packer-builder-arm
         run: |
-          sudo -E PATH=$PATH:$(pwd)/packer-builder-arm packer build arch-arm64-base.pkr.hcl
+          sudo packer build arch-arm64-base.pkr.hcl
 
       - name: List build outputs
         run: |
