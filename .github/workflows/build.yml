@@ -1,0 +1,81 @@
+name: Build Arch ARM64 Image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Image with packer-builder-arm
+        run: |
+          docker run --rm --privileged \
+            -v /dev:/dev \
+            -v ${{ github.workspace }}:/build \
+            -w /build \
+            mkaczanowski/packer-builder-arm:latest \
+            build arch-arm64-base.pkr.hcl
+
+      - name: List build outputs
+        run: |
+          echo "=== Build Outputs ==="
+          ls -lh output/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-linux-arm64-base-${{ github.sha }}
+          path: |
+            output/*.qcow2
+            output/*.sha256
+          retention-days: 30
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            output/*.qcow2
+            output/*.sha256
+          body: |
+            # Arch Linux ARM64 Cloud Image
+
+            Build from commit: ${{ github.sha }}
+
+            ## Installation
+
+            ```bash
+            openstack image create \
+              --disk-format qcow2 --container-format bare --public \
+              --property hw_firmware_type=uefi \
+              --property hw_machine_type=virt \
+              --property hw_disk_bus=virtio \
+              --property os_type=linux --property os_distro=arch \
+              --file arch-linux-arm64-base.qcow2 "arch-linux-arm64"
+            ```
+
+            ## Default User
+
+            - Username: `alarm`
+            - Authentication: SSH key only (injected via cloud-init)
+            - Sudo: Passwordless via wheel group
