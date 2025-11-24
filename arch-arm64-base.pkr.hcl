@@ -1,15 +1,6 @@
 # Arch Linux ARM64 Cloud Image for OpenStack
 # Built with packer-builder-arm
 
-packer {
-  required_plugins {
-    arm = {
-      version = ">= 1.0.0"
-      source  = "github.com/mkaczanowski/arm"
-    }
-  }
-}
-
 variable "image_name" {
   type    = string
   default = "arch-linux-arm64-base"
