@@ -39,7 +39,7 @@ jobs:
           git clone https://github.com/mkaczanowski/packer-builder-arm.git
           cd packer-builder-arm
           go mod download
-          go build
+          go build -v .
           cd ..
 
       - name: Install Packer
@@ -47,14 +47,9 @@ jobs:
         with:
           packer-version: '1.10.0'
 
-      - name: Link packer-builder-arm plugin
-        run: |
-          mkdir -p ~/.packer.d/plugins
-          ln -sf $(pwd)/packer-builder-arm/packer-builder-arm ~/.packer.d/plugins/packer-builder-arm
-
       - name: Build Image with packer-builder-arm
         run: |
-          sudo -E packer build arch-arm64-base.pkr.hcl
+          sudo -E PATH=$PATH:$(pwd)/packer-builder-arm packer build arch-arm64-base.pkr.hcl
 
       - name: List build outputs
         run: |
