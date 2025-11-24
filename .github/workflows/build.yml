@@ -48,9 +48,18 @@ jobs:
         with:
           packer-version: '1.10.0'
 
+      - name: Verify plugin installation
+        run: |
+          echo "=== Checking for packer-builder-arm in PATH ==="
+          which packer-builder-arm || echo "Not in PATH"
+          ls -la /usr/local/bin/packer-builder-arm || echo "Not in /usr/local/bin"
+          echo "=== Testing packer-builder-arm executable ==="
+          /usr/local/bin/packer-builder-arm version || echo "Cannot execute"
+
       - name: Build Image with packer-builder-arm
         run: |
-          sudo packer build arch-arm64-base.pkr.hcl
+          export PACKER_LOG=1
+          sudo -E PACKER_LOG=1 packer build arch-arm64-base.pkr.hcl
 
       - name: List build outputs
         run: |
