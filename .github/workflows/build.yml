@@ -36,22 +36,25 @@ jobs:
 
       - name: Build packer-builder-arm from source
         run: |
-          cd /tmp
           git clone https://github.com/mkaczanowski/packer-builder-arm.git
           cd packer-builder-arm
           go mod download
           go build
-          sudo cp packer-builder-arm /usr/local/bin/
-          sudo chmod +x /usr/local/bin/packer-builder-arm
+          cd ..
 
       - name: Install Packer
         uses: hashicorp-contrib/setup-packer@v3
         with:
           packer-version: '1.10.0'
 
+      - name: Link packer-builder-arm plugin
+        run: |
+          mkdir -p ~/.packer.d/plugins
+          ln -sf $(pwd)/packer-builder-arm/packer-builder-arm ~/.packer.d/plugins/packer-builder-arm
+
       - name: Build Image with packer-builder-arm
         run: |
-          sudo packer build arch-arm64-base.pkr.hcl
+          sudo -E packer build arch-arm64-base.pkr.hcl
 
       - name: List build outputs
         run: |
