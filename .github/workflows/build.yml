@@ -19,22 +19,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
         with:
-          platforms: arm64
+          go-version: '1.21'
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            fdisk \
+            gdisk \
+            qemu-user-static \
+            qemu-utils \
+            libarchive-tools
+
+      - name: Build packer-builder-arm from source
+        run: |
+          cd /tmp
+          git clone https://github.com/mkaczanowski/packer-builder-arm.git
+          cd packer-builder-arm
+          go mod download
+          go build
+          sudo cp packer-builder-arm /usr/local/bin/
+          sudo chmod +x /usr/local/bin/packer-builder-arm
+
+      - name: Install Packer
+        uses: hashicorp-contrib/setup-packer@v3
+        with:
+          packer-version: '1.10.0'
 
       - name: Build Image with packer-builder-arm
         run: |
-          docker run --rm --privileged \
-            -v /dev:/dev \
-            -v ${{ github.workspace }}:/build \
-            -w /build \
-            mkaczanowski/packer-builder-arm:latest \
-            build arch-arm64-base.pkr.hcl
+          sudo packer build arch-arm64-base.pkr.hcl
 
       - name: List build outputs
         run: |
