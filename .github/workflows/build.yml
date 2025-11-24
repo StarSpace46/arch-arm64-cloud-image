@@ -27,9 +27,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Create output directory
-        run: mkdir -p output
-
       - name: Build Image with packer-builder-arm
         run: |
           docker run --rm --privileged \
