@@ -34,7 +34,7 @@ jobs:
             -v ${{ github.workspace }}:/build \
             -w /build \
             mkaczanowski/packer-builder-arm:latest \
-            build arch-arm64-base.pkr.hcl
+            sh -c "packer init arch-arm64-base.pkr.hcl && packer build arch-arm64-base.pkr.hcl"
 
       - name: List build outputs
         run: |
