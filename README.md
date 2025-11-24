@@ -1,13 +1,13 @@
-# Arch Linux ARM64 Cloud Image for OpenStack
+# Arch Linux ARM64 Cloud Image
 
-[![Build Status](https://github.com/starspace46/arch-arm64-base-openstack/actions/workflows/build.yml/badge.svg)](https://github.com/starspace46/arch-arm64-base-openstack/actions)
+[![Build Status](https://github.com/starspace46/arch-arm64-cloud-image/actions/workflows/build.yml/badge.svg)](https://github.com/starspace46/arch-arm64-cloud-image/actions)
 
 **The first maintained Arch Linux ARM64 cloud image since 2022.**
 
 ## Features
 
 - **ARM64 Native**: Built for aarch64/ARM64 processors
-- **OpenStack Ready**: Full cloud-init 25.x integration with OpenStack metadata service
+- **Cloud Ready**: Full cloud-init 25.x integration (OpenStack, AWS, Azure, etc.)
 - **UEFI Boot**: Modern GPT partitioning with GRUB bootloader
 - **Minimal Base**: Clean installation (~2-3GB compressed)
 - **Rolling Release**: Latest Arch packages at build time
@@ -22,7 +22,7 @@ Arch Linux ARM stopped providing maintained cloud images around 2022. This proje
 
 ### Pre-built Images
 
-Download from [Releases](https://github.com/starspace46/arch-arm64-base-openstack/releases).
+Download from [Releases](https://github.com/starspace46/arch-arm64-cloud-image/releases).
 
 ### Upload to OpenStack
 
@@ -157,8 +157,8 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/starspace46/arch-arm64-base-openstack/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/starspace46/arch-arm64-base-openstack/discussions)
+- **Issues**: [GitHub Issues](https://github.com/starspace46/arch-arm64-cloud-image/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/starspace46/arch-arm64-cloud-image/discussions)
 
 ## Roadmap
 
