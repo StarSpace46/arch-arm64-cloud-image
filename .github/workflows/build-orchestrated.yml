@@ -97,12 +97,36 @@ jobs:
           echo "Retrieved artifacts:"
           ls -lh output/
 
+      - name: Convert Image Formats
+        run: |
+          set -euo pipefail
+          cd output
+          QCOW2="$(ls Arch-Linux-ARM64-cloudimg-*.qcow2)"
+          BASENAME="${QCOW2%.qcow2}"
+
+          echo "Converting to RAW format..."
+          qemu-img convert -p -f qcow2 -O raw "${QCOW2}" "${BASENAME}.raw"
+
+          echo "Converting to VHD format..."
+          qemu-img convert -p -f raw -O vpc -o subformat=fixed,force_size=on "${BASENAME}.raw" "${BASENAME}.vhd"
+
+          echo "Compressing RAW format..."
+          gzip -f "${BASENAME}.raw"
+
+          echo "Compressing VHD format..."
+          gzip -f "${BASENAME}.vhd"
+
+          echo "All formats generated:"
+          ls -lh
+
       - name: Generate Checksums
         run: |
           cd output
-          for file in *.qcow2; do
-            echo "Generating checksum for ${file}..."
-            sha256sum "${file}" > "${file}.sha256"
+          for file in Arch-Linux-ARM64-cloudimg-*; do
+            if [ -f "$file" ] && [[ ! "$file" =~ \.sha256$ ]]; then
+              echo "Generating checksum for ${file}..."
+              sha256sum "${file}" > "${file}.sha256"
+            fi
           done
 
           echo "Checksums generated:"
@@ -114,6 +138,8 @@ jobs:
           name: arch-linux-arm64-cloudimg
           path: |
             output/*.qcow2
+            output/*.raw.gz
+            output/*.vhd.gz
             output/*.sha256
           retention-days: 30
 
@@ -133,11 +159,19 @@ jobs:
 
             Download the `.qcow2` image and verify with the `.sha256` checksum.
 
+            ## Formats
+
+            - **QCOW2**: OpenStack, Proxmox, QEMU/KVM
+            - **RAW (gzipped)**: AWS, GCP
+            - **VHD (gzipped)**: Azure
+
             ## Usage
 
             See [README.md](README.md) for deployment instructions for various cloud platforms.
           files: |
             output/*.qcow2
+            output/*.raw.gz
+            output/*.vhd.gz
             output/*.sha256
           draft: false
           prerelease: false
