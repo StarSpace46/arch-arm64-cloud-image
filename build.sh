@@ -185,13 +185,15 @@ cat > /etc/hosts << 'HOSTS_EOF'
 127.0.1.1   archlinux.localdomain archlinux
 HOSTS_EOF
 
-# Enable services
-systemctl enable sshd
-systemctl enable cloud-init
-systemctl enable cloud-init-local
-systemctl enable cloud-config
-systemctl enable cloud-final
-systemctl enable dhcpcd
+# Enable services (create symlinks manually - systemctl doesn't work in chroot)
+mkdir -p /etc/systemd/system/multi-user.target.wants
+mkdir -p /etc/systemd/system/cloud-init.target.wants
+ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service
+ln -sf /usr/lib/systemd/system/cloud-init-local.service /etc/systemd/system/cloud-init.target.wants/cloud-init-local.service
+ln -sf /usr/lib/systemd/system/cloud-init-main.service /etc/systemd/system/cloud-init.target.wants/cloud-init-main.service
+ln -sf /usr/lib/systemd/system/cloud-init-network.service /etc/systemd/system/cloud-init.target.wants/cloud-init-network.service
+ln -sf /usr/lib/systemd/system/cloud-init.target /etc/systemd/system/multi-user.target.wants/cloud-init.target
+ln -sf /usr/lib/systemd/system/dhcpcd.service /etc/systemd/system/multi-user.target.wants/dhcpcd.service
 
 # Configure sudo for wheel group
 echo "%wheel ALL=(ALL:ALL) NOPASSWD: ALL" > /etc/sudoers.d/wheel
