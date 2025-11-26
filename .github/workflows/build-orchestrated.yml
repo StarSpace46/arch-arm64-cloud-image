@@ -1,0 +1,163 @@
+name: Build Arch ARM64 Cloud Image (Orchestrated)
+
+on:
+  schedule:
+    # Run on the 1st of every month at 00:00 UTC
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Enable debug output'
+        required: false
+        default: 'false'
+
+env:
+  OPENSTACK_RC: /home/alarm/github-runner-openrc.sh
+
+jobs:
+  build:
+    name: Build Image on Ephemeral Builder
+    runs-on: self-hosted
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup OpenStack Environment
+        run: |
+          if [ ! -f "${OPENSTACK_RC}" ]; then
+            echo "ERROR: OpenStack RC file not found at ${OPENSTACK_RC}"
+            exit 1
+          fi
+          source "${OPENSTACK_RC}"
+          openstack --version
+
+      - name: Create Builder VM
+        id: create-builder
+        run: |
+          source "${OPENSTACK_RC}"
+
+          # Create ephemeral builder VM
+          OUTPUT=$(.github/scripts/manage-builder.sh create)
+
+          # Extract variables
+          BUILDER_ID=$(echo "$OUTPUT" | grep BUILDER_ID | cut -d= -f2)
+          BUILDER_IP=$(echo "$OUTPUT" | grep BUILDER_IP | cut -d= -f2)
+          BUILDER_NAME=$(echo "$OUTPUT" | grep BUILDER_NAME | cut -d= -f2)
+
+          # Save to GitHub output
+          echo "builder_id=${BUILDER_ID}" >> $GITHUB_OUTPUT
+          echo "builder_ip=${BUILDER_IP}" >> $GITHUB_OUTPUT
+          echo "builder_name=${BUILDER_NAME}" >> $GITHUB_OUTPUT
+
+          echo "Builder VM created: ${BUILDER_NAME} (${BUILDER_ID}) at ${BUILDER_IP}"
+
+      - name: Wait for Builder Ready
+        run: |
+          source "${OPENSTACK_RC}"
+          .github/scripts/manage-builder.sh wait
+
+          BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
+          echo "Builder VM is ready at ${BUILDER_IP}"
+
+      - name: Transfer Build Script
+        run: |
+          BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
+
+          echo "Copying build script to builder VM..."
+          scp -o StrictHostKeyChecking=no \
+              build.sh \
+              "alarm@${BUILDER_IP}:~/build.sh"
+
+          echo "Build script transferred successfully"
+
+      - name: Execute Build on Builder
+        id: build
+        run: |
+          BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
+
+          echo "Starting build on builder VM..."
+          ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" \
+              "sudo bash ~/build.sh"
+
+          echo "Build completed successfully"
+
+      - name: Retrieve Build Artifacts
+        run: |
+          BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
+
+          echo "Retrieving build artifacts from builder VM..."
+          mkdir -p output
+          scp -o StrictHostKeyChecking=no \
+              "alarm@${BUILDER_IP}:~/output/*.qcow2" \
+              output/
+
+          # List artifacts
+          echo "Retrieved artifacts:"
+          ls -lh output/
+
+      - name: Generate Checksums
+        run: |
+          cd output
+          for file in *.qcow2; do
+            echo "Generating checksum for ${file}..."
+            sha256sum "${file}" > "${file}.sha256"
+          done
+
+          echo "Checksums generated:"
+          cat *.sha256
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-linux-arm64-cloudimg
+          path: |
+            output/*.qcow2
+            output/*.sha256
+          retention-days: 30
+
+      - name: Create Release (on schedule)
+        if: github.event_name == 'schedule'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}-$(date +%Y%m)
+          name: Arch Linux ARM64 Cloud Image - $(date +%Y-%m)
+          body: |
+            Monthly automated build of Arch Linux ARM64 cloud image.
+
+            **Build Date**: $(date +%Y-%m-%d)
+            **Run ID**: ${{ github.run_id }}
+
+            ## Download
+
+            Download the `.qcow2` image and verify with the `.sha256` checksum.
+
+            ## Usage
+
+            See [README.md](README.md) for deployment instructions for various cloud platforms.
+          files: |
+            output/*.qcow2
+            output/*.sha256
+          draft: false
+          prerelease: false
+
+      - name: Cleanup Builder VM
+        if: always()
+        run: |
+          source "${OPENSTACK_RC}"
+
+          echo "Destroying builder VM..."
+          .github/scripts/manage-builder.sh destroy
+
+          echo "Builder VM cleanup complete"
+
+      - name: Report Build Status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Build completed successfully"
+          else
+            echo "❌ Build failed"
+            exit 1
+          fi

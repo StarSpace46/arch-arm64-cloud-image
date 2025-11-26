@@ -34,32 +34,25 @@ jobs:
             qemu-utils \
             libarchive-tools
 
+      - name: Install Packer
+        uses: hashicorp-contrib/setup-packer@v3
+        with:
+          packer-version: '1.10.0'
+
       - name: Build packer-builder-arm from source
         run: |
           git clone https://github.com/mkaczanowski/packer-builder-arm.git
           cd packer-builder-arm
           go mod download
           go build -v .
+          # Install as legacy external plugin in PATH
           sudo cp packer-builder-arm /usr/local/bin/
           cd ..
 
-      - name: Install Packer
-        uses: hashicorp-contrib/setup-packer@v3
-        with:
-          packer-version: '1.10.0'
-
-      - name: Verify plugin installation
-        run: |
-          echo "=== Checking for packer-builder-arm in PATH ==="
-          which packer-builder-arm || echo "Not in PATH"
-          ls -la /usr/local/bin/packer-builder-arm || echo "Not in /usr/local/bin"
-          echo "=== Testing packer-builder-arm executable ==="
-          /usr/local/bin/packer-builder-arm version || echo "Cannot execute"
-
       - name: Build Image with packer-builder-arm
         run: |
-          export PACKER_LOG=1
-          sudo -E PACKER_LOG=1 packer build arch-arm64-base.pkr.hcl
+          # Use sudo packer - external plugins are discovered via PATH
+          sudo packer build arch-arm64-base.pkr.hcl
 
       - name: List build outputs
         run: |

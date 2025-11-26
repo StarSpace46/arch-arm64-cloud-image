@@ -1,168 +1,282 @@
 # Arch Linux ARM64 Cloud Image
 
-[![Build Status](https://github.com/starspace46/arch-arm64-cloud-image/actions/workflows/build.yml/badge.svg)](https://github.com/starspace46/arch-arm64-cloud-image/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**The first maintained Arch Linux ARM64 cloud image since 2022.**
+Ready-to-use Arch Linux ARM64 cloud images for OpenStack, AWS, Azure, GCP, and other cloud platforms.
 
-## Features
+## Download
 
-- **ARM64 Native**: Built for aarch64/ARM64 processors
-- **Cloud Ready**: Full cloud-init 25.x integration (OpenStack, AWS, Azure, etc.)
-- **UEFI Boot**: Modern GPT partitioning with GRUB bootloader
-- **Minimal Base**: Clean installation (~2-3GB compressed)
-- **Rolling Release**: Latest Arch packages at build time
-- **Reproducible**: Automated Packer builds with HCL templates
-- **Open Source**: MIT licensed, contributions welcome
+[Latest Release](../../releases/latest)
 
-## Why This Exists
+| File | Description |
+|------|-------------|
+| `Arch-Linux-ARM64-cloudimg-YYYYMMDD.qcow2` | QCOW2 format (OpenStack, Proxmox, QEMU/KVM) |
+| `Arch-Linux-ARM64-cloudimg-YYYYMMDD.qcow2.sha256` | SHA256 checksum |
 
-Arch Linux ARM stopped providing maintained cloud images around 2022. This project fills that gap with automated, reproducible builds using modern infrastructure-as-code tooling.
+**Verify downloads:**
+```bash
+sha256sum -c Arch-Linux-ARM64-cloudimg-YYYYMMDD.qcow2.sha256
+```
 
-## Quick Start
+### Planned Additions
 
-### Pre-built Images
+Future releases will include:
+- Raw format (`.raw.gz`) for AWS and GCP
+- VHD format (`.vhd.gz`) for Azure
+- GPG signatures for all artifacts
 
-Download from [Releases](https://github.com/starspace46/arch-arm64-cloud-image/releases).
+For now, use `qemu-img convert` to create other formats locally:
+```bash
+# Convert to raw
+qemu-img convert -f qcow2 -O raw image.qcow2 image.raw
 
-### Upload to OpenStack
+# Convert to VHD
+qemu-img convert -f qcow2 -O vpc image.qcow2 image.vhd
+```
+
+## Image Details
+
+| Property | Value |
+|----------|-------|
+| Architecture | ARM64 (aarch64) |
+| Firmware | UEFI |
+| Bootloader | GRUB |
+| Cloud-init | Configured for OpenStack, NoCloud, ConfigDrive, EC2, Azure, GCE |
+| Default user | `alarm` (passwordless sudo) |
+| Root password | Locked |
+| SSH | Key-based authentication only |
+
+## Platform Deployment Guides
+
+### OpenStack
 
 ```bash
+# Upload image
 openstack image create \
   --disk-format qcow2 \
   --container-format bare \
-  --public \
+  --file Arch-Linux-ARM64-cloudimg-YYYYMMDD.qcow2 \
   --property hw_firmware_type=uefi \
   --property hw_machine_type=virt \
-  --property hw_disk_bus=virtio \
-  --property os_type=linux \
-  --property os_distro=arch \
-  --file arch-linux-arm64-base.qcow2 \
-  "arch-linux-arm64"
-```
+  --property architecture=aarch64 \
+  --public \
+  arch-linux-arm64
 
-### Launch Instance
-
-```bash
+# Launch instance
 openstack server create \
-  --flavor <your-flavor> \
+  --flavor <arm64-flavor> \
   --image arch-linux-arm64 \
-  --network <your-network> \
+  --network <network> \
   --key-name <your-key> \
   my-arch-vm
-```
 
-### Connect
-
-```bash
+# Connect
 ssh alarm@<instance-ip>
 ```
 
-## Default User
+### AWS (Graviton Instances)
 
-- **Username**: `alarm` (Arch Linux ARM convention)
-- **Authentication**: SSH key only (password login disabled)
-- **Sudo**: Passwordless sudo via `wheel` group
-- **Shell**: `/bin/bash`
+```bash
+# Extract raw image
+gunzip Arch-Linux-ARM64-cloudimg-YYYYMMDD.raw.gz
 
-## What's Included
+# Upload to S3
+aws s3 cp Arch-Linux-ARM64-cloudimg-YYYYMMDD.raw s3://your-bucket/
 
-### Base System
-- Arch Linux ARM rolling release
-- Linux kernel (latest stable)
-- systemd init system
-- NetworkManager for network configuration
-- OpenSSH server
+# Import as AMI
+aws ec2 import-image \
+  --disk-containers "Format=raw,UserBucket={S3Bucket=your-bucket,S3Key=arch-arm64.raw}" \
+  --architecture arm64 \
+  --boot-mode uefi
 
-### Cloud Integration
-- cloud-init 25.x (built from AUR)
-- OpenStack metadata service support
-- Automatic hostname configuration
-- SSH key injection
-- Root filesystem resize on first boot
-- User data script execution
+# Launch on Graviton (t4g, m6g, c6g, etc.)
+aws ec2 run-instances \
+  --image-id <imported-ami-id> \
+  --instance-type t4g.micro \
+  --key-name <your-key>
 
-### Development Tools
-- base-devel package group
-- git, curl, wget, vim
-- Python 3 with pip
+# Connect
+ssh alarm@<public-ip>
+```
+
+### Azure
+
+```bash
+# Extract VHD image
+gunzip Arch-Linux-ARM64-cloudimg-YYYYMMDD.vhd.gz
+
+# Upload to Azure Storage and create image
+az storage blob upload --account-name <storage> --container images --file Arch-Linux-ARM64-cloudimg-YYYYMMDD.vhd --name arch-arm64.vhd
+az image create --resource-group <rg> --name arch-linux-arm64 --source <blob-url> --os-type Linux --hyper-v-generation V2
+
+# Launch (Dpsv5, Epsv5, or other ARM64 VM sizes)
+az vm create \
+  --resource-group <rg> \
+  --name my-arch-vm \
+  --image arch-linux-arm64 \
+  --size Standard_D2ps_v5 \
+  --admin-username alarm \
+  --ssh-key-value @~/.ssh/id_rsa.pub
+
+# Connect
+ssh alarm@<public-ip>
+```
+
+### Google Cloud Platform (Tau T2A)
+
+```bash
+# Extract and repackage for GCP
+gunzip Arch-Linux-ARM64-cloudimg-YYYYMMDD.raw.gz
+tar -czvf arch-arm64.tar.gz Arch-Linux-ARM64-cloudimg-YYYYMMDD.raw
+
+# Upload to GCS
+gsutil cp arch-arm64.tar.gz gs://your-bucket/
+
+# Create image
+gcloud compute images create arch-linux-arm64 \
+  --source-uri=gs://your-bucket/arch-arm64.tar.gz \
+  --architecture=ARM64 \
+  --guest-os-features=UEFI_COMPATIBLE
+
+# Launch (t2a-standard-1, etc.)
+gcloud compute instances create my-arch-vm \
+  --image=arch-linux-arm64 \
+  --machine-type=t2a-standard-1 \
+  --zone=us-central1-a
+
+# Connect
+gcloud compute ssh alarm@my-arch-vm
+```
+
+### Hetzner Cloud
+
+```bash
+# Hetzner supports custom images via their API
+# Upload via Hetzner Cloud Console or API
+# Select CAX (ARM64) instance types
+
+# Connect
+ssh alarm@<server-ip>
+```
+
+### Vultr
+
+```bash
+# Upload via Vultr Custom ISO/Image feature
+# Select "Cloud Compute - ARM" instances
+
+# Connect
+ssh alarm@<instance-ip>
+```
+
+### DigitalOcean
+
+```bash
+# Upload via DigitalOcean Custom Images
+doctl compute image create arch-linux-arm64 \
+  --image-url "https://your-host/arch-arm64.raw.gz" \
+  --region nyc1
+
+# Create droplet (if ARM64 available in your region)
+doctl compute droplet create my-arch-vm \
+  --image <image-id> \
+  --size <arm64-size> \
+  --ssh-keys <key-fingerprint>
+```
+
+### Proxmox VE
+
+```bash
+# Download image to Proxmox host
+wget -O /var/lib/vz/template/iso/arch-arm64.qcow2 <release-url>
+
+# Create VM (via UI or CLI)
+qm create 100 --name arch-arm64 --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0
+qm importdisk 100 /var/lib/vz/template/iso/arch-arm64.qcow2 local-lvm
+qm set 100 --scsi0 local-lvm:vm-100-disk-0 --boot c --bootdisk scsi0
+qm set 100 --bios ovmf --machine virt
+qm start 100
+```
+
+### Generic QEMU/KVM
+
+```bash
+# Launch with UEFI
+qemu-system-aarch64 \
+  -M virt \
+  -cpu cortex-a72 \
+  -m 2048 \
+  -bios /usr/share/AAVMF/AAVMF_CODE.fd \
+  -drive file=Arch-Linux-ARM64-cloudimg-YYYYMMDD.qcow2,format=qcow2 \
+  -device virtio-net-pci,netdev=net0 \
+  -netdev user,id=net0,hostfwd=tcp::2222-:22 \
+  -nographic
+
+# Connect
+ssh -p 2222 alarm@localhost
+```
+
+## Customization
+
+This base image is designed for customization. Common use cases include GPU drivers (NVIDIA, AMD), container runtimes (Docker, Podman), ML/AI frameworks (PyTorch, TensorFlow, Ollama), and development tools.
+
+Recommended workflow:
+1. Deploy base image on your platform
+2. SSH in and install your packages
+3. Clean up: `sudo pacman -Scc && sudo cloud-init clean --logs`
+4. Snapshot/create custom image from your platform's console
+
+## Updating Packages
+
+Arch Linux is a rolling release. Update your instance:
+
+```bash
+sudo pacman -Syu
+```
+
+## Troubleshooting
+
+See [docs/troubleshooting.md](docs/troubleshooting.md) for common issues.
+
+### Quick fixes
+
+**Cannot SSH in:**
+- Use username `alarm` (not `root` or `arch`)
+- Verify SSH key was provided via cloud-init/user-data
+- Check security groups/firewall allows port 22
+
+**Package manager errors:**
+```bash
+sudo pacman -Sy archlinux-keyring && sudo pacman -Syu
+```
 
 ## Building Your Own
 
-See [BUILDING.md](BUILDING.md) for detailed build instructions.
+If you want to build images yourself or contribute improvements:
 
-**Requirements**:
-- Docker (for GitHub Actions or local builds)
-- OR: ARM64 host with Packer + packer-builder-arm
-
-**Quick build**:
 ```bash
-# Using Docker
-docker run --rm --privileged \
-  -v /dev:/dev \
-  -v ${PWD}:/build \
-  mkaczanowski/packer-builder-arm:latest \
-  build arch-arm64-base.pkr.hcl
-
-# Using local Packer (on ARM64 host)
+# Requires Arch Linux ARM64 host
+git clone https://github.com/StarSpace46/arch-arm64-cloud-image.git
+cd arch-arm64-cloud-image
 sudo ./build.sh
+# Output: ./output/Arch-Linux-ARM64-cloudimg-YYYYMMDD.qcow2
 ```
 
-## Technical Details
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
 
-### Partitioning
-- **GPT** partition table for UEFI compatibility
-- **EFI System Partition**: 512MB FAT32 (`/boot/efi`)
-- **Root Partition**: Remaining space, ext4 (`/`)
+## Release Schedule
 
-### Boot Configuration
-- **GRUB** bootloader for ARM64 UEFI
-- Serial console enabled (`ttyAMA0,115200`)
-- GRUB timeout: 5 seconds
-
-### Cloud-Init
-- **Datasources**: OpenStack, NoCloud, None (in order)
-- **Metadata URL**: http://169.254.169.254
-- **Network**: Managed by NetworkManager
-- **Root filesystem**: Grows automatically on first boot
-
-## Compatibility
-
-Tested on:
-- OpenStack Zed (2023.2)
-- OpenStack 2024.1 (Caracal)
-
-Should work on any OpenStack deployment with:
-- ARM64 compute nodes
-- UEFI firmware support
-- Cloud-init metadata service
-
-## Contributing
-
-Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+New images are published monthly to incorporate security updates.
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) file for details.
+MIT License - See [LICENSE](LICENSE)
+
+## Maintainer
+
+[StarSpace46 AI Lab](https://starspace46.com)
 
 ## Acknowledgments
 
-- Built by [StarSpace46 AI Lab](https://starspace46.com) as part of our OpenStack infrastructure project
-- Uses [packer-builder-arm](https://github.com/mkaczanowski/packer-builder-arm) by Mateusz Kaczanowski
-- Inspired by the Arch Linux ARM community
-
-## Related Projects
-
-- [Arch Linux ARM](https://archlinuxarm.org/) - Official Arch Linux ARM port
-- [cloud-init](https://cloud-init.io/) - Industry standard cloud instance initialization
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/starspace46/arch-arm64-cloud-image/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/starspace46/arch-arm64-cloud-image/discussions)
-
-## Roadmap
-
-- [ ] Automated quarterly rebuilds
-- [ ] Additional cloud platform support (AWS ARM Graviton, Azure ARM)
-- [ ] Minimal variant (even smaller base image)
-- [ ] GPU-enabled variant (separate private repo)
+- Build methodology based on [arch-boxes](https://gitlab.archlinux.org/archlinux/arch-boxes)
+- Arch Linux ARM community

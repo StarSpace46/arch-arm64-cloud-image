@@ -1,22 +1,11 @@
-# Build outputs
 output/
-*.img
 *.qcow2
-*.qcow2.sha256
+*.raw
+*.raw.gz
+*.vhd
+*.vhd.gz
+*.sha256
+*.sig
+*.tar
 *.tar.gz
-*.md5
-
-# Packer cache
-packer_cache/
-.packer/
-
-# Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS files
 .DS_Store
-Thumbs.db

@@ -1,0 +1,73 @@
+name: Build Arch ARM64 Cloud Image
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., 2025.11)'
+        required: false
+
+jobs:
+  build:
+    runs-on: [self-hosted, linux, arm64, arch-builder]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo pacman -Sy --noconfirm --needed \
+            arch-install-scripts \
+            qemu \
+            qemu-arch-extra \
+            gdisk \
+            cloud-init \
+            gzip \
+            git
+
+      - name: Build image
+        run: sudo ./build.sh
+
+      - name: Convert image formats
+        run: |
+          set -euo pipefail
+          cd output
+          QCOW2="$(ls Arch-Linux-ARM64-cloudimg-*.qcow2)"
+          BASENAME="${QCOW2%.qcow2}"
+
+          qemu-img convert -p -f qcow2 -O raw "${QCOW2}" "${BASENAME}.raw"
+          qemu-img convert -p -f raw -O vpc -o subformat=fixed,force_size=on "${BASENAME}.raw" "${BASENAME}.vhd"
+
+          gzip -f "${BASENAME}.raw"
+          gzip -f "${BASENAME}.vhd"
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd output
+          for file in Arch-Linux-ARM64-cloudimg-*; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" > "${file}.sha256"
+            fi
+          done
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="$(date +%Y.%m)"
+          fi
+          cd output
+          gh release create "v${VERSION}" \
+            --title "Arch Linux ARM64 Cloud Image ${VERSION}" \
+            --notes "Monthly automated build - $(date +%Y-%m-%d)" \
+            Arch-Linux-ARM64-cloudimg-*.qcow2 \
+            Arch-Linux-ARM64-cloudimg-*.raw.gz \
+            Arch-Linux-ARM64-cloudimg-*.vhd.gz \
+            Arch-Linux-ARM64-cloudimg-*.sha256
