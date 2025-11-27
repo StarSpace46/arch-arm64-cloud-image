@@ -190,8 +190,9 @@ mkdir -p /etc/systemd/system/multi-user.target.wants
 mkdir -p /etc/systemd/system/cloud-init.target.wants
 ln -sf /usr/lib/systemd/system/sshd.service /etc/systemd/system/multi-user.target.wants/sshd.service
 ln -sf /usr/lib/systemd/system/cloud-init-local.service /etc/systemd/system/cloud-init.target.wants/cloud-init-local.service
-ln -sf /usr/lib/systemd/system/cloud-init-main.service /etc/systemd/system/cloud-init.target.wants/cloud-init-main.service
-ln -sf /usr/lib/systemd/system/cloud-init-network.service /etc/systemd/system/cloud-init.target.wants/cloud-init-network.service
+ln -sf /usr/lib/systemd/system/cloud-init.service /etc/systemd/system/cloud-init.target.wants/cloud-init.service
+ln -sf /usr/lib/systemd/system/cloud-config.service /etc/systemd/system/cloud-init.target.wants/cloud-config.service
+ln -sf /usr/lib/systemd/system/cloud-final.service /etc/systemd/system/cloud-init.target.wants/cloud-final.service
 ln -sf /usr/lib/systemd/system/cloud-init.target /etc/systemd/system/multi-user.target.wants/cloud-init.target
 ln -sf /usr/lib/systemd/system/dhcpcd.service /etc/systemd/system/multi-user.target.wants/dhcpcd.service
 
