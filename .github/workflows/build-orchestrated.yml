@@ -90,6 +90,9 @@ jobs:
           echo "Converting image formats on builder VM..."
           ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" bash << 'REMOTE_EOF'
           set -euo pipefail
+
+          # Fix ownership - build.sh runs as root, conversion runs as alarm user
+          sudo chown -R alarm:alarm ~/output
           cd ~/output
           QCOW2="$(ls Arch-Linux-ARM64-cloudimg-*.qcow2)"
           BASENAME="${QCOW2%.qcow2}"
