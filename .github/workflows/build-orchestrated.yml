@@ -83,24 +83,14 @@ jobs:
 
           echo "Build completed successfully"
 
-      - name: Retrieve Build Artifacts
+      - name: Convert Image Formats on Builder
         run: |
           BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
 
-          echo "Retrieving build artifacts from builder VM..."
-          mkdir -p output
-          scp -o StrictHostKeyChecking=no \
-              "alarm@${BUILDER_IP}:~/output/*.qcow2" \
-              output/
-
-          # List artifacts
-          echo "Retrieved artifacts:"
-          ls -lh output/
-
-      - name: Convert Image Formats
-        run: |
+          echo "Converting image formats on builder VM..."
+          ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" bash << 'REMOTE_EOF'
           set -euo pipefail
-          cd output
+          cd ~/output
           QCOW2="$(ls Arch-Linux-ARM64-cloudimg-*.qcow2)"
           BASENAME="${QCOW2%.qcow2}"
 
@@ -118,6 +108,25 @@ jobs:
 
           echo "All formats generated:"
           ls -lh
+          REMOTE_EOF
+
+          echo "Format conversion completed on builder VM"
+
+      - name: Retrieve Build Artifacts
+        run: |
+          BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
+
+          echo "Retrieving build artifacts from builder VM..."
+          mkdir -p output
+          scp -o StrictHostKeyChecking=no \
+              "alarm@${BUILDER_IP}:~/output/*.qcow2" \
+              "alarm@${BUILDER_IP}:~/output/*.raw.gz" \
+              "alarm@${BUILDER_IP}:~/output/*.vhd.gz" \
+              output/
+
+          # List artifacts
+          echo "Retrieved artifacts:"
+          ls -lh output/
 
       - name: Generate Checksums
         run: |
