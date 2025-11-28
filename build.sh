@@ -297,9 +297,9 @@ system_info:
 CLOUD_EOF
 
     # Critical: Cloud-init generator needs this symlink (Arch Linux packaging quirk)
-    # The actual location is /usr/libexec/cloud-init/ds-identify but cloud-init expects /usr/lib
+    # The actual location is /usr/lib/cloud-init/ds-identify but cloud-init expects /usr/bin
     log "Creating ds-identify symlink..."
-    arch-chroot "${MOUNT_DIR}" ln -sf /usr/libexec/cloud-init/ds-identify /usr/bin/ds-identify
+    arch-chroot "${MOUNT_DIR}" ln -sf /usr/lib/cloud-init/ds-identify /usr/bin/ds-identify
 }
 
 optimize_image() {
