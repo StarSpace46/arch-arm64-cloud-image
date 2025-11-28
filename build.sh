@@ -40,7 +40,21 @@ error() {
 
 cleanup() {
     log "Cleaning up..."
-    umount -R "${MOUNT_DIR}" 2>/dev/null || true
+
+    # Kill any processes using the mount point
+    if mountpoint -q "${MOUNT_DIR}" 2>/dev/null; then
+        fuser -km "${MOUNT_DIR}" 2>/dev/null || true
+        sleep 1
+    fi
+
+    # Sync before unmounting
+    sync
+
+    # Try recursive unmount, fall back to lazy unmount if needed
+    if ! umount -R "${MOUNT_DIR}" 2>/dev/null; then
+        log "Normal unmount failed, trying lazy unmount..."
+        umount -l "${MOUNT_DIR}" 2>/dev/null || true
+    fi
 
     # Detach loop device if set
     if [ -n "${LOOP_DEV:-}" ]; then
@@ -314,14 +328,29 @@ finalize_image() {
     # Ensure all writes are flushed to disk
     sync
 
-    # Unmount filesystems with retry logic
+    # Unmount filesystems with robust retry logic
     log "Unmounting filesystems..."
+
+    # Kill any processes using the mount point
+    log "Checking for processes using ${MOUNT_DIR}..."
+    fuser -km "${MOUNT_DIR}" 2>/dev/null || true
+    sleep 1
+
+    # First attempt: normal recursive unmount
     if ! umount -R "${MOUNT_DIR}" 2>/dev/null; then
         log "First unmount attempt failed, syncing and retrying..."
         sync
         sleep 2
-        umount -R "${MOUNT_DIR}" || error "Failed to unmount ${MOUNT_DIR}"
+
+        # Second attempt: retry after sync
+        if ! umount -R "${MOUNT_DIR}" 2>/dev/null; then
+            log "Second unmount attempt failed, using lazy unmount..."
+            # Final fallback: lazy unmount
+            umount -l "${MOUNT_DIR}" || error "Failed to unmount ${MOUNT_DIR}"
+        fi
     fi
+
+    log "Filesystems unmounted successfully"
 
     # Detach loop device
     log "Detaching loop device ${LOOP_DEV}..."
