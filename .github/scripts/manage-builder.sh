@@ -13,6 +13,7 @@ BUILDER_IMAGE="arch-linux-arm64-builder"  # Must exist in OpenStack
 BUILDER_NETWORK="provider-vlan151-1"  # Provider network VLAN 151
 BUILDER_KEY="github-runner-key"  # SSH key name in OpenStack
 STATE_FILE="/tmp/builder-state-${GITHUB_RUN_ID:-local}.json"
+SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -o ConnectTimeout=5"
 
 log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
@@ -32,9 +33,11 @@ create_builder() {
         error "Image '${BUILDER_IMAGE}' not found in OpenStack. Please create base image first."
     fi
 
-    # Create VM with cloud-init (build tools already in builder image)
+    # Create VM with cloud-init (most tools in builder image, parted installed at runtime)
     local USER_DATA=$(cat <<'EOF'
 #cloud-config
+packages:
+  - parted
 runcmd:
   - systemctl enable sshd
   - systemctl start sshd
@@ -115,13 +118,12 @@ wait_for_builder() {
     local RETRIES=60
     local COUNT=0
     while [ $COUNT -lt $RETRIES ]; do
-        if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -o BatchMode=yes \
-               "alarm@${VM_IP}" "echo 'SSH ready'" &>/dev/null; then
+        if ssh ${SSH_OPTS} "alarm@${VM_IP}" "echo 'SSH ready'" &>/dev/null; then
             log "Builder VM is SSH-ready"
 
             # Wait a bit more for cloud-init to finish package installation
             log "Waiting for cloud-init to complete..."
-            ssh "alarm@${VM_IP}" "cloud-init status --wait" || true
+            ssh ${SSH_OPTS} "alarm@${VM_IP}" "cloud-init status --wait" || true
 
             log "Builder VM is fully ready"
             return 0
