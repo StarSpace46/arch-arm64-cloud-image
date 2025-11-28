@@ -72,6 +72,16 @@ jobs:
 
           echo "Build script transferred successfully"
 
+      - name: Install Build Dependencies
+        run: |
+          BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
+
+          echo "Installing build tools on builder VM..."
+          ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" \
+              "sudo pacman -Sy --noconfirm qemu arch-install-scripts dosfstools e2fsprogs"
+
+          echo "Build dependencies installed successfully"
+
       - name: Execute Build on Builder
         id: build
         run: |
