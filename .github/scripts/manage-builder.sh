@@ -9,7 +9,7 @@ ACTION="${1:-}"
 # Configuration
 BUILDER_NAME="arch-image-builder-$(date +%s)"
 BUILDER_FLAVOR="ss46.arm64.medium"  # 4 vCPU, 8GB RAM, 80GB disk
-BUILDER_IMAGE="arch-linux-arm64-base"  # Must exist in OpenStack
+BUILDER_IMAGE="arch-linux-arm64-builder"  # Must exist in OpenStack
 BUILDER_NETWORK="provider-vlan151-1"  # Provider network VLAN 151
 BUILDER_KEY="github-runner-key"  # SSH key name in OpenStack
 STATE_FILE="/tmp/builder-state-${GITHUB_RUN_ID:-local}.json"
@@ -32,16 +32,9 @@ create_builder() {
         error "Image '${BUILDER_IMAGE}' not found in OpenStack. Please create base image first."
     fi
 
-    # Create VM with cloud-init to install build dependencies
+    # Create VM with cloud-init (build tools already in builder image)
     local USER_DATA=$(cat <<'EOF'
 #cloud-config
-package_update: true
-packages:
-  - qemu-img
-  - arch-install-scripts
-  - parted
-  - dosfstools
-  - e2fsprogs
 runcmd:
   - systemctl enable sshd
   - systemctl start sshd
