@@ -76,6 +76,10 @@ jobs:
         run: |
           BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
 
+          echo "Waiting for pacman lock to be released..."
+          ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" \
+              "timeout 120 bash -c 'while sudo fuser /var/lib/pacman/db.lck &>/dev/null; do echo \"Waiting for pacman lock...\"; sleep 2; done' || true"
+
           echo "Installing build tools on builder VM..."
           ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" \
               "sudo pacman -Sy --noconfirm qemu arch-install-scripts dosfstools e2fsprogs"
