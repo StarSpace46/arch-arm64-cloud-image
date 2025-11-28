@@ -26,7 +26,6 @@ CLOUD_PACKAGES="cloud-init cloud-guest-utils"
 BOOT_PACKAGES="grub efibootmgr"
 NETWORK_PACKAGES="dhcpcd openssh"
 UTILITY_PACKAGES="sudo vim"
-BUILD_PACKAGES="qemu arch-install-scripts dosfstools e2fsprogs"
 
 # Functions
 log() {
@@ -156,8 +155,7 @@ install_base_system() {
         ${CLOUD_PACKAGES} \
         ${BOOT_PACKAGES} \
         ${NETWORK_PACKAGES} \
-        ${UTILITY_PACKAGES} \
-        ${BUILD_PACKAGES}
+        ${UTILITY_PACKAGES}
 }
 
 configure_system() {
