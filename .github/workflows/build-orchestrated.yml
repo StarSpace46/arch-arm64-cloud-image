@@ -72,24 +72,6 @@ jobs:
 
           echo "Build script transferred successfully"
 
-      - name: Install Build Dependencies
-        run: |
-          BUILDER_IP="${{ steps.create-builder.outputs.builder_ip }}"
-
-          echo "Waiting for pacman lock to be released..."
-          ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" \
-              "timeout 120 bash -c 'while sudo fuser /var/lib/pacman/db.lck &>/dev/null; do echo \"Waiting for pacman lock...\"; sleep 2; done' || true"
-
-          echo "Initializing GPG keyring..."
-          ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" \
-              "sudo pacman-key --init && sudo pacman-key --populate archlinuxarm"
-
-          echo "Installing build tools on builder VM..."
-          ssh -o StrictHostKeyChecking=no "alarm@${BUILDER_IP}" \
-              "sudo pacman -Sy --noconfirm qemu arch-install-scripts dosfstools e2fsprogs"
-
-          echo "Build dependencies installed successfully"
-
       - name: Execute Build on Builder
         id: build
         run: |
